@@ -175,8 +175,8 @@
             }
 
             const tooltips = {
-                'Context Recall': 'Measures how well the response incorporates relevant information from the retrieved documents. Higher scores indicate better usage of provided context.',
-                'Faithfulness': 'Evaluates whether the response stays true to the retrieved context without making unsupported claims or hallucinations. Higher scores indicate better alignment with source documents.',
+                'Context Recall': 'This measures (on a scale from 0-1) how well the retrieved content aligns with the Ground Truth Answer.',
+                'Context Precision': 'This metric measures whether the RAG application can return the most relevant chunks (with respect to the Ground Truth) at the top.'
                 //'Factual Correctness': 'Assesses the accuracy of factual statements in the response compared to the retrieved documents. Higher scores indicate more accurate information.'
             };
 
@@ -189,7 +189,7 @@
                             label: 'Output 1',
                             data: [
                                 gliaMetrics.context_recall,
-                                gliaMetrics.faithfulness,
+                                gliaMetrics.context_precision,
                                 //gliaMetrics.factual_correctness
                             ],
                             backgroundColor: 'rgba(75, 192, 192, 0.5)',
@@ -200,7 +200,7 @@
                             label: 'Output 2',
                             data: [
                                 anthropicMetrics.context_recall,
-                                anthropicMetrics.faithfulness,
+                                anthropicMetrics.context_precision,
                                 //anthropicMetrics.factual_correctness
                             ],
                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
@@ -211,7 +211,7 @@
                             label: 'Output 3',
                             data: [
                                 baseMetrics.context_recall,
-                                baseMetrics.faithfulness,
+                                baseMetrics.context_precision,
                                 //baseMetrics.factual_correctness
                             ],
                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
