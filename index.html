@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Evaluation Interface</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        .metrics-chart {
+            max-height: 300px;
+            margin: 20px 0;
+        }
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">RAG Evaluation Interface</h1>
+        
+        <!-- Input Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form id="evaluationForm">
+                    <div class="mb-3">
+                        <label for="query" class="form-label">Query</label>
+                        <textarea class="form-control" id="query" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="response" class="form-label">Response</label>
+                        <textarea class="form-control" id="response" rows="5" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Evaluate</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="row">
+            <!-- Metrics Visualization -->
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Evaluation Metrics</h5>
+                        <p class="text-muted small mb-3">Hover over metric names for descriptions</p>
+                        <canvas id="metricsChart" class="metrics-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Glia RAG Results -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-1-circle-fill text-primary"></i> Output 1
+                            <!-- <span class="badge bg-primary float-end">Primary</span> -->
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="gliaResults">
+                            <div class="mb-3">
+                                <h6 class="d-flex justify-content-between align-items-center">
+                                    Generated Response:
+                                    <button class="btn btn-sm btn-outline-primary copy-btn" data-target="glia-response">
+                                        <i class="bi bi-clipboard"></i> Copy
+                                    </button>
+                                </h6>
+                                <pre class="generated-response border rounded p-2 bg-light" id="glia-response"></pre>
+                            </div>
+                            <div class="mb-3">
+                                <h6>Retrieved Context:</h6>
+                                <div class="relevant-docs"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Anthropic RAG Results -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-2-circle-fill text-info"></i> Output 2
+                            <!-- <span class="badge bg-info float-end">Secondary</span> -->
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="anthropicResults">
+                            <div class="mb-3">
+                                <h6 class="d-flex justify-content-between align-items-center">
+                                    Generated Response:
+                                    <button class="btn btn-sm btn-outline-info copy-btn" data-target="anthropic-response">
+                                        <i class="bi bi-clipboard"></i> Copy
+                                    </button>
+                                </h6>
+                                <pre class="generated-response border rounded p-2 bg-light" id="anthropic-response"></pre>
+                            </div>
+                            <div class="mb-3">
+                                <h6>Retrieved Context:</h6>
+                                <div class="relevant-docs"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Base RAG Results -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-3-circle-fill text-success"></i> Output 3
+                            <!-- <span class="badge bg-success float-end">Baseline</span> -->
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="baseResults">
+                            <div class="mb-3">
+                                <h6 class="d-flex justify-content-between align-items-center">
+                                    Generated Response:
+                                    <button class="btn btn-sm btn-outline-success copy-btn" data-target="base-response">
+                                        <i class="bi bi-clipboard"></i> Copy
+                                    </button>
+                                </h6>
+                                <pre class="generated-response border rounded p-2 bg-light" id="base-response"></pre>
+                            </div>
+                            <div class="mb-3">
+                                <h6>Retrieved Context:</h6>
+                                <div class="relevant-docs"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="mt-2">Processing...</div>
+    </div>
+
+    <script>
+        let metricsChart = null;
+
+        function showLoading() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        function updateMetricsChart(gliaMetrics, anthropicMetrics, baseMetrics) {
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            
+            if (metricsChart) {
+                metricsChart.destroy();
+            }
+
+            const tooltips = {
+                'Context Recall': 'Measures how well the response incorporates relevant information from the retrieved documents. Higher scores indicate better usage of provided context.',
+                'Faithfulness': 'Evaluates whether the response stays true to the retrieved context without making unsupported claims or hallucinations. Higher scores indicate better alignment with source documents.',
+                'Factual Correctness': 'Assesses the accuracy of factual statements in the response compared to the retrieved documents. Higher scores indicate more accurate information.'
+            };
+
+            metricsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(tooltips),
+                    datasets: [
+                        {
+                            label: 'Output 1',
+                            data: [
+                                gliaMetrics.context_recall,
+                                gliaMetrics.faithfulness,
+                                //gliaMetrics.factual_correctness
+                            ],
+                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Output 2',
+                            data: [
+                                anthropicMetrics.context_recall,
+                                anthropicMetrics.faithfulness,
+                                //anthropicMetrics.factual_correctness
+                            ],
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Output 3',
+                            data: [
+                                baseMetrics.context_recall,
+                                baseMetrics.faithfulness,
+                                //baseMetrics.factual_correctness
+                            ],
+                            backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                beforeTitle: function(context) {
+                                    const label = context[0].label;
+                                    return tooltips[label];
+                                },
+                                title: function(context) {
+                                    return context[0].label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateResults(data) {
+            // Update Glia Results
+            const gliaSection = document.getElementById('gliaResults');
+            gliaSection.querySelector('.generated-response').textContent = data.glia_result.response;
+            gliaSection.querySelector('.relevant-docs').innerHTML = data.glia_result.relevant_docs
+                .map(doc => {
+                    // Updated regex patterns to handle Glia's format
+                    const titleMatch = doc.match(/Title: (.*?)(?=\s+Recommendation:)/);
+                    const recommendationMatch = doc.match(/Recommendation: (.*?)(?=\s+Rating:)/);
+                    const ratingMatch = doc.match(/Rating: (.*?)$/);
+
+                    return `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h6 class="text-primary mb-2">${titleMatch ? titleMatch[1].trim() : ''}</h6>
+                                <div class="mb-2">
+                                    <strong>Recommendation:</strong>
+                                    <p class="mb-1">${recommendationMatch ? recommendationMatch[1].trim() : ''}</p>
+                                </div>
+                                <div class="mb-0">
+                                    <span class="badge ${ratingMatch && ratingMatch[1].includes('STRONG') ? 'bg-success' : 'bg-secondary'}">
+                                        ${ratingMatch ? ratingMatch[1].trim() : ''}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>`;
+                })
+                .join('');
+
+            // Update Anthropic Results
+            const anthropicSection = document.getElementById('anthropicResults');
+            anthropicSection.querySelector('.generated-response').textContent = data.anthropic_rag.response;
+            anthropicSection.querySelector('.relevant-docs').innerHTML = data.anthropic_rag.relevant_docs
+                .map(doc => {
+                    // Parse the document string to extract components
+                    const titleMatch = doc.match(/Title: (.*?)(?=\s+Recommendation:)/);
+                    const recommendationMatch = doc.match(/Recommendation: (.*?)(?=\s+Guide:)/);
+                    const guideMatch = doc.match(/Guide: (.*?)(?=\s+Rating:)/);
+                    const ratingMatch = doc.match(/Rating: (.*?)$/);
+
+                    return `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h6 class="text-primary mb-2">${titleMatch ? titleMatch[1] : ''}</h6>
+                                <div class="mb-2">
+                                    <strong>Recommendation:</strong>
+                                    <p class="mb-1">${recommendationMatch ? recommendationMatch[1] : ''}</p>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Guide:</strong>
+                                    <p class="mb-1">${guideMatch ? guideMatch[1] : ''}</p>
+                                </div>
+                                <div class="mb-0">
+                                    <span class="badge bg-secondary">${ratingMatch ? ratingMatch[1] : ''}</span>
+                                </div>
+                            </div>
+                        </div>`;
+                })
+                .join('');
+
+            // Update Base Results with the same structured format
+            const baseSection = document.getElementById('baseResults');
+            baseSection.querySelector('.generated-response').textContent = data.base_rag.response;
+            baseSection.querySelector('.relevant-docs').innerHTML = data.base_rag.relevant_docs
+                .map(doc => {
+                    // Parse the document string to extract components
+                    const titleMatch = doc.match(/Title: (.*?)(?=\s+Recommendation:)/);
+                    const recommendationMatch = doc.match(/Recommendation: (.*?)(?=\s+Guide:)/);
+                    const guideMatch = doc.match(/Guide: (.*?)(?=\s+Rating:)/);
+                    const ratingMatch = doc.match(/Rating: (.*?)$/);
+
+                    return `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h6 class="text-primary mb-2">${titleMatch ? titleMatch[1] : ''}</h6>
+                                <div class="mb-2">
+                                    <strong>Recommendation:</strong>
+                                    <p class="mb-1">${recommendationMatch ? recommendationMatch[1] : ''}</p>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Guide:</strong>
+                                    <p class="mb-1">${guideMatch ? guideMatch[1] : ''}</p>
+                                </div>
+                                <div class="mb-0">
+                                    <span class="badge bg-secondary">${ratingMatch ? ratingMatch[1] : ''}</span>
+                                </div>
+                            </div>
+                        </div>`;
+                })
+                .join('');
+
+            // Update metrics chart with all three results
+            updateMetricsChart(data.glia_result.metrics, data.anthropic_rag.metrics, data.base_rag.metrics);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Could add a toast notification here if desired
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        // Add click handlers for copy buttons
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.copy-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.getAttribute('data-target');
+                    const text = document.getElementById(targetId).textContent;
+                    copyToClipboard(text);
+                    
+                    // Update button text temporarily
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                    }, 2000);
+                });
+            });
+        });
+
+        document.getElementById('evaluationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const query = document.getElementById('query').value;
+            const response = document.getElementById('response').value;
+
+            try {
+                const result = await fetch('https://exp-transcription.outcomes.ai/ingestion/evaluate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer 3d48a92d0a556c989f0bdea7bfb7fdd9e80fcdc883f69e678090091d94514d10'
+                    },
+                    body: JSON.stringify({ query, response })
+                });
+
+                const data = await result.json();
+                if (result.ok) {
+                    updateResults(data);
+                } else {
+                    alert(`Error: ${data.error || 'Unknown error occurred'}`);
+                }
+            } catch (error) {
+                alert('Error connecting to the server. Please ensure the backend is running.');
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        });
+    </script>
+</body>
+</html> 
